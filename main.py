@@ -6,7 +6,8 @@ from typing import Dict, Any
 
 from ui_manager import UIManager
 from camera_manager import CameraManager
-from gps_manager import GPSManager
+# from gps_manager import GPSManager
+from ublox_gps_manager import UbloxGPSManager
 from storage_manager import StorageManager
 
 class MainApplication:
@@ -14,7 +15,8 @@ class MainApplication:
         self.root = tk.Tk()
         self.ui = UIManager(self.root)
         self.camera = CameraManager()
-        self.gps = GPSManager()
+        # self.gps = GPSManager()
+        self.gps = UbloxGPSManager()
         self.storage = StorageManager()
         
         # Set up callbacks
