@@ -1,7 +1,4 @@
-__pycache__/camera_manager.cpython-310.pyc
-__pycache__/gps_manager.cpython-310.pyc
-__pycache__/storage_manager.cpython-310.pyc
-__pycache__/ui_manager.cpython-310.pyc
+__pycache__
 oakAppEnv/lib64
 oakAppEnv/pyvenv.cfg
 oakAppEnv/bin/activate
@@ -6433,3 +6430,5 @@ oakGPSLogger/Scripts/pyserial-miniterm.exe
 oakGPSLogger/Scripts/pyserial-ports.exe
 oakGPSLogger/Scripts/python.exe
 oakGPSLogger/Scripts/pythonw.exe
+__pycache__/ublox_gps_manager.cpython-312.pyc
+result/*

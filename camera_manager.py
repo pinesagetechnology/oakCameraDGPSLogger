@@ -3,7 +3,7 @@ import cv2
 import numpy as np
 import threading
 import time
-from typing import Optional, Tuple, Callable
+from typing import Optional, Tuple, Callable, List, Dict
 from datetime import datetime
 
 class CameraManager:
@@ -14,7 +14,45 @@ class CameraManager:
         self.camera_thread = None
         self.frame_callback = None
         self.mask_coords = [0, 0, 0, 0]
+        self.available_devices = []
+        self.current_device_info = None
+        self.device_info_callback = None
         
+    def find_devices(self) -> List[dai.DeviceInfo]:
+        """Find all available OAK devices"""
+        try:
+            # Find all available devices
+            self.available_devices = dai.Device.getAllAvailableDevices()
+            
+            print(f"Found {len(self.available_devices)} devices")
+            for device in self.available_devices:
+                print(f"Device: {device.getMxId()} - State: {device.state}")
+                
+            return self.available_devices
+        except Exception as e:
+            print(f"Error finding devices: {e}")
+            return []
+        
+    def get_device_info(self, device_info: dai.DeviceInfo) -> Dict:
+        """Get detailed information about a device"""
+        try:
+            with dai.Device(device_info) as device:
+                cameras = device.getConnectedCameras()
+                usb_speed = device.getUsbSpeed()
+                imu_data = device.hasIMU()
+                
+                return {
+                    'name': device_info.getMxId(),
+                    'cameras': [str(cam) for cam in cameras],
+                    'usb_speed': str(usb_speed),
+                    'has_imu': imu_data,
+                    'state': device_info.state,
+                    'protocol': device_info.protocol
+                }
+        except Exception as e:
+            print(f"Error getting device info: {str(e)}")
+            return None
+            
     def create_pipeline(self) -> dai.Pipeline:
         """Create and configure the camera pipeline"""
         pipeline = dai.Pipeline()
@@ -58,15 +96,27 @@ class CameraManager:
 
         return pipeline
         
-    def start_camera(self, frame_callback: Callable) -> bool:
-        """Start the camera with frame callback"""
+    def start_camera(self, device_info: Optional[dai.DeviceInfo] = None, 
+                    frame_callback: Callable = None,
+                    device_info_callback: Callable = None) -> bool:
+        """Start the camera with optional device selection"""
         if self.running:
             return False
             
         try:
             self.pipeline = self.create_pipeline()
-            self.device = dai.Device(self.pipeline)
             
+            # Create device with specific device_info if provided
+            if device_info:
+                self.device = dai.Device(self.pipeline, device_info)
+            else:
+                self.device = dai.Device(self.pipeline)
+            
+            self.current_device_info = self.get_device_info(device_info if device_info else self.device.getDeviceInfo())
+            if device_info_callback:
+                device_info_callback(self.current_device_info)
+            
+            # Get output queues
             self.q_rgb = self.device.getOutputQueue(name="rgb", maxSize=4, blocking=False)
             self.q_depth = self.device.getOutputQueue(name="depth", maxSize=4, blocking=False)
             self.q_left = self.device.getOutputQueue(name="left", maxSize=4, blocking=False)
@@ -113,6 +163,8 @@ class CameraManager:
             except Exception as e:
                 print(f"Error in camera update: {str(e)}")
                 
+            time.sleep(0.001)  # Small sleep to prevent busy waiting
+                
     def stop_camera(self):
         """Stop the camera"""
         self.running = False
@@ -138,6 +190,10 @@ class CameraManager:
             mask = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)
         
         return cv2.bitwise_and(frame, mask)
+        
+    def get_current_device_info(self) -> Optional[Dict]:
+        """Get current device information"""
+        return self.current_device_info
         
     def __del__(self):
         self.stop_camera()
