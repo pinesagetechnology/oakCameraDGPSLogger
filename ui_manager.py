@@ -97,7 +97,7 @@ class UIManager:
         self.settings_frame.pack(fill=tk.X, padx=5, pady=2)
         
         # GPS Settings
-        self.gps_enabled = tk.BooleanVar(value=False)
+        self.gps_enabled = tk.BooleanVar(value=True)
         self.gps_toggle = ttk.Checkbutton(
             self.settings_frame,
             text="Enable GPS",

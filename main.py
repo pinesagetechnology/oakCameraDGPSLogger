@@ -14,7 +14,14 @@ class MainApplication:
         self.root = tk.Tk()
         self.ui = UIManager(self.root)
         self.camera = CameraManager()
-        self.gps = None  # Initialize GPS as None
+        # Initialize GPS since it's enabled by default
+        try:
+            self.gps = GPSManager()
+        except Exception as e:
+            print(f"Failed to initialize GPS: {str(e)}")
+            self.gps = None
+            self.ui.set_gps_enabled(False)  # Disable GPS button
+            
         self.storage = StorageManager()
         self.last_gps_coords = None
         self.gps_threshold = 0.0001  # About 11 meters threshold
