@@ -410,8 +410,8 @@ class UIManager:
         self.dir_entry.config(state='disabled')
         self.dir_btn.config(state='disabled')
         self.interval_entry.config(state='disabled')
-        self.mask_entry.config(state='disabled')
-        self.mask_btn.config(state='disabled')
+        # self.mask_entry.config(state='disabled')
+        # self.mask_btn.config(state='disabled')
         self.device_combo.config(state='disabled')
         self.refresh_btn.config(state='disabled')
 
@@ -420,8 +420,8 @@ class UIManager:
         self.dir_entry.config(state='normal')
         self.dir_btn.config(state='normal')
         self.interval_entry.config(state='normal')
-        self.mask_entry.config(state='normal')
-        self.mask_btn.config(state='normal')
+        # self.mask_entry.config(state='normal')
+        # self.mask_btn.config(state='normal')
         self.device_combo.config(state='readonly')
         self.refresh_btn.config(state='normal')
         
