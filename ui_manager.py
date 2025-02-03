@@ -11,8 +11,15 @@ class UIManager:
         self.root = root
         self.root.title("OAK-D Camera with GPS")
         
+        # Set minimum window size (width x height)
+        self.root.minsize(1024, 768)
+        
+        # Set initial window size if not fullscreen
+        self.root.geometry("1280x960")
+        
         # Set fullscreen
         self.root.attributes('-fullscreen', True)
+        
         # Bind Escape key to toggle fullscreen
         self.root.bind('<Escape>', self._toggle_fullscreen)
         
@@ -20,14 +27,17 @@ class UIManager:
         self.main_container = ttk.PanedWindow(self.root, orient=tk.HORIZONTAL)
         self.main_container.pack(fill=tk.BOTH, expand=True)
         
-        # Create left menu frame
+        # Set minimum width for left menu
         self.left_menu = ttk.Frame(self.main_container, width=250)
         self.left_menu.pack_propagate(False)  # Prevent frame from shrinking
         self.main_container.add(self.left_menu, weight=0)
         
-        # Create right content frame
+        # Create right content frame with minimum width
         self.right_content = ttk.Frame(self.main_container)
         self.main_container.add(self.right_content, weight=1)
+        
+        # Initialize fullscreen state
+        self.is_fullscreen = True
         
         # Callbacks
         self.start_callback = None
@@ -182,43 +192,59 @@ class UIManager:
         self.feeds_container = ttk.Frame(self.right_content)
         self.feeds_container.pack(expand=True, fill=tk.BOTH, padx=5, pady=5)
         
-        # Configure grid for 3x1 layout
-        self.feeds_container.grid_columnconfigure(0, weight=1)
-        self.feeds_container.grid_rowconfigure((0, 1, 2), weight=1, uniform="row")
+        # Configure grid with 2 columns
+        self.feeds_container.grid_columnconfigure((0, 1), weight=1, uniform="col")
+        self.feeds_container.grid_rowconfigure((0, 1), weight=1, uniform="row")
         
-        # Create camera feed labels
+        # Create camera feed labels with new grid layout
         self.rgb_label = ttk.Label(self.feeds_container)
-        self.rgb_label.grid(row=0, column=0, sticky="nsew", padx=2, pady=2)
+        self.rgb_label.grid(row=0, column=0, columnspan=2, sticky="nsew", padx=2, pady=2)
         
         self.depth_label = ttk.Label(self.feeds_container)
         self.depth_label.grid(row=1, column=0, sticky="nsew", padx=2, pady=2)
         
         self.ir_label = ttk.Label(self.feeds_container)
-        self.ir_label.grid(row=2, column=0, sticky="nsew", padx=2, pady=2)
+        self.ir_label.grid(row=1, column=1, sticky="nsew", padx=2, pady=2)
 
     def update_frames(self, frames: Dict[str, Any]):
-        """Update camera feed displays with compact scaling"""
+        """Update camera feed displays with balanced scaling"""
         container_width = self.feeds_container.winfo_width() - 10
-        container_height = (self.feeds_container.winfo_height() // 3) - 10
+        container_height = (self.feeds_container.winfo_height() - 10) // 2  # Divide by 2 rows
         
         if 'rgb' in frames:
             frame_rgb = cv2.cvtColor(frames['rgb'], cv2.COLOR_BGR2RGB)
-            img_rgb = self._resize_frame_compact(frame_rgb, container_width, container_height)
+            # RGB gets full width
+            img_rgb = self._resize_frame_balanced(frame_rgb, container_width, container_height)
             self.rgb_label.configure(image=img_rgb)
             self.rgb_label.image = img_rgb
 
         if 'depth' in frames:
             frame_depth = cv2.cvtColor(frames['depth'], cv2.COLOR_BGR2RGB)
-            img_depth = self._resize_frame_compact(frame_depth, container_width, container_height)
+            # Depth gets half width
+            img_depth = self._resize_frame_balanced(frame_depth, container_width // 2, container_height)
             self.depth_label.configure(image=img_depth)
             self.depth_label.image = img_depth
 
         if 'ir' in frames:
             frame_ir = cv2.cvtColor(frames['ir'], cv2.COLOR_GRAY2RGB)
-            img_ir = self._resize_frame_compact(frame_ir, container_width, container_height)
+            # IR gets half width
+            img_ir = self._resize_frame_balanced(frame_ir, container_width // 2, container_height)
             self.ir_label.configure(image=img_ir)
             self.ir_label.image = img_ir
 
+    def _resize_frame_balanced(self, frame, target_width, target_height):
+        """Resize frame to fit target dimensions while maintaining aspect ratio"""
+        height, width = frame.shape[:2]
+        width_scale = target_width / width
+        height_scale = target_height / height
+        scale = min(width_scale, height_scale) * 0.95  # Use 95% of available space
+        
+        new_width = int(width * scale)
+        new_height = int(height * scale)
+        
+        frame = cv2.resize(frame, (new_width, new_height))
+        return ImageTk.PhotoImage(Image.fromarray(frame))
+    
     def _resize_frame_compact(self, frame, target_width, target_height):
         """Resize frame to fit target dimensions while maintaining aspect ratio"""
         height, width = frame.shape[:2]
@@ -233,9 +259,27 @@ class UIManager:
         return ImageTk.PhotoImage(Image.fromarray(frame))
     
     def _toggle_fullscreen(self, event=None):
-        """Toggle fullscreen mode"""
-        is_fullscreen = self.root.attributes('-fullscreen')
-        self.root.attributes('-fullscreen', not is_fullscreen)
+        """Toggle fullscreen mode while maintaining minimum size"""
+        self.is_fullscreen = not self.is_fullscreen
+        self.root.attributes('-fullscreen', self.is_fullscreen)
+        
+        if not self.is_fullscreen:
+            # When exiting fullscreen, ensure window has good default size
+            screen_width = self.root.winfo_screenwidth()
+            screen_height = self.root.winfo_screenheight()
+            
+            # Set window size to 75% of screen size or minimum size, whichever is larger
+            default_width = max(int(screen_width * 0.75), 1024)
+            default_height = max(int(screen_height * 0.75), 768)
+            
+            # Calculate position to center the window
+            x = (screen_width - default_width) // 2
+            y = (screen_height - default_height) // 2
+            
+            # Set size and position
+            self.root.geometry(f"{default_width}x{default_height}+{x}+{y}")
+            
+        return "break"  # Prevent the event from propagating
         
     def show_capture_notification(self, message: str):
         """Show temporary capture notification"""
