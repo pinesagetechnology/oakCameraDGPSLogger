@@ -51,7 +51,6 @@ class GPSManager:
             return 0, current
             
         distance = self.calculate_distance(self.last_position, current)
-        self.last_position = current
         return distance, current
 
     def find_gps_port(self) -> Optional[str]:
