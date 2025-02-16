@@ -6,6 +6,7 @@ import threading
 import time
 from typing import Optional, Callable
 import json
+from math import radians, sin, cos, sqrt, atan2 
 
 class GPSManager:
     def __init__(self):
