@@ -421,16 +421,16 @@ class UIManager:
                     messagebox.showerror("Error", "Please select a device first")
                     return
 
-            interval_settings = self.get_interval_settings()
-            if interval_settings['value'] < 1:
-                raise ValueError("Interval must be at least 1 second")
-            
-            if self.start_callback:
-                self.start_callback(interval_settings)  # Pass the dictionary
+                interval_settings = self.get_interval_settings()
+                if interval_settings['value'] < 1:
+                    raise ValueError("Interval must be at least 1 second")
                 
-            self.running = True
-            self.start_btn.config(text="Stop Camera")
-            self._disable_settings()
+                if self.start_callback:
+                    self.start_callback(interval_settings)  # Pass the dictionary
+                    
+                self.running = True
+                self.start_btn.config(text="Stop Camera")
+                self._disable_settings()
                 
             except ValueError as e:
                 messagebox.showerror("Error", str(e))
