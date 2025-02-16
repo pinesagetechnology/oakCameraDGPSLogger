@@ -40,10 +40,14 @@ class StorageManager:
     def save_frames_with_metadata(self, 
                                 frames: Dict[str, Any], 
                                 metadata: Dict,
-                                timestamp: datetime = None):
+                                timestamp: datetime = None,
+                                capture_type: str = "auto"):
         """Save multiple frames with associated metadata"""
         if timestamp is None:
             timestamp = datetime.now()
+            
+        # Add capture type to metadata
+        metadata['capture_type'] = capture_type
             
         saved_files = []
         for frame_type, frame in frames.items():

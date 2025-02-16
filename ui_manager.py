@@ -11,6 +11,34 @@ class UIManager:
         self.root = root
         self.root.title("OAK-D Camera with GPS")
         
+        # Set minimum window size (width x height)
+        self.root.minsize(1024, 768)
+        
+        # Set initial window size if not fullscreen
+        self.root.geometry("1280x960")
+        
+        # Make window resizable
+        self.root.resizable(True, True)
+        
+        # Bind Escape key to toggle fullscreen
+        self.root.bind('<Escape>', self._toggle_fullscreen)
+        
+        # Create main container
+        self.main_container = ttk.PanedWindow(self.root, orient=tk.HORIZONTAL)
+        self.main_container.pack(fill=tk.BOTH, expand=True)
+        
+        # Set minimum width for left menu
+        self.left_menu = ttk.Frame(self.main_container, width=250)
+        self.left_menu.pack_propagate(False)  # Prevent frame from shrinking
+        self.main_container.add(self.left_menu, weight=0)
+        
+        # Create right content frame with minimum width
+        self.right_content = ttk.Frame(self.main_container)
+        self.main_container.add(self.right_content, weight=1)
+        
+        # Initialize fullscreen state
+        self.is_fullscreen = True
+        
         # Callbacks
         self.start_callback = None
         self.stop_callback = None
@@ -18,6 +46,8 @@ class UIManager:
         self.directory_callback = None
         self.device_select_callback = None
         self.refresh_devices_callback = None
+        self.gps_toggle_callback = None
+        self._manual_capture_callback = None
         
         # State
         self.running = False
@@ -26,19 +56,34 @@ class UIManager:
         # Create UI elements
         self.setup_ui()
         
+        # Bind manual capture key
+        self.root.bind('c', lambda e: self._manual_capture_callback() if self._manual_capture_callback else None)
+        self.root.bind('C', lambda e: self._manual_capture_callback() if self._manual_capture_callback else None)
+            
     def setup_ui(self):
         """Setup all UI elements"""
+        self._setup_left_menu()
+        self._setup_right_content()
+        
+    def _setup_left_menu(self):
+        """Setup left menu components"""
+        # Style configuration
+        style = ttk.Style()
+        style.configure('LeftMenu.TLabelframe', padding=5)
+        
         # Device Selection Frame
-        self.device_frame = ttk.LabelFrame(self.root, text="Device Selection")
-        self.device_frame.pack(side=tk.TOP, fill=tk.X, padx=5, pady=5)
+        self.device_frame = ttk.LabelFrame(self.left_menu, text="Device Selection", style='LeftMenu.TLabelframe')
+        self.device_frame.pack(fill=tk.X, padx=5, pady=2)
         
         # Device dropdown
         self.device_var = tk.StringVar()
-        self.device_combo = ttk.Combobox(self.device_frame, 
-                                       textvariable=self.device_var,
-                                       state='readonly',
-                                       width=50)
-        self.device_combo.pack(side=tk.LEFT, padx=5, pady=5)
+        self.device_combo = ttk.Combobox(
+            self.device_frame, 
+            textvariable=self.device_var,
+            state='readonly',
+            width=30
+        )
+        self.device_combo.pack(fill=tk.X, padx=5, pady=2)
         self.device_combo.bind('<<ComboboxSelected>>', self._on_device_selected)
         
         # Refresh button
@@ -47,90 +92,264 @@ class UIManager:
             text="Refresh Devices",
             command=self._refresh_devices
         )
-        self.refresh_btn.pack(side=tk.LEFT, padx=5, pady=5)
+        self.refresh_btn.pack(fill=tk.X, padx=5, pady=2)
         
         # Device info label
-        self.device_info_label = ttk.Label(self.device_frame, text="No device selected")
-        self.device_info_label.pack(side=tk.LEFT, padx=20, pady=5)
+        self.device_info_label = ttk.Label(
+            self.device_frame, 
+            text="No device selected",
+            wraplength=240
+        )
+        self.device_info_label.pack(fill=tk.X, padx=5, pady=2)
 
         # Settings Frame
-        self.settings_frame = ttk.LabelFrame(self.root, text="Settings")
-        self.settings_frame.pack(side=tk.TOP, fill=tk.X, padx=5, pady=5)
+        self.settings_frame = ttk.LabelFrame(self.left_menu, text="Settings", style='LeftMenu.TLabelframe')
+        self.settings_frame.pack(fill=tk.X, padx=5, pady=2)
         
-        # GPS Enable/Disable
-        ttk.Label(self.settings_frame, text="GPS Module:").grid(row=0, column=0, padx=5, pady=5)
-        self.gps_enabled = tk.BooleanVar(value=False)
+        # GPS Settings
+        self.gps_enabled = tk.BooleanVar(value=True)
         self.gps_toggle = ttk.Checkbutton(
-            self.settings_frame, 
+            self.settings_frame,
             text="Enable GPS",
             variable=self.gps_enabled,
             command=self._toggle_gps
         )
-        self.gps_toggle.grid(row=0, column=1, sticky="w", padx=5, pady=5)
+        self.gps_toggle.pack(fill=tk.X, padx=5, pady=2)
         
-        # Directory selection
-        ttk.Label(self.settings_frame, text="Save Directory:").grid(row=1, column=0, padx=5, pady=5)
+        # Save Directory
+        ttk.Label(self.settings_frame, text="Save Directory:").pack(fill=tk.X, padx=5, pady=(2,0))
         self.dir_var = tk.StringVar(value=os.path.join(os.getcwd(), "result"))
-        self.dir_entry = ttk.Entry(self.settings_frame, textvariable=self.dir_var, width=50)
-        self.dir_entry.grid(row=1, column=1, padx=5, pady=5)
+        self.dir_entry = ttk.Entry(self.settings_frame, textvariable=self.dir_var)
+        self.dir_entry.pack(fill=tk.X, padx=5, pady=2)
         self.dir_btn = ttk.Button(self.settings_frame, text="Browse", command=self._select_directory)
-        self.dir_btn.grid(row=1, column=2, padx=5, pady=5)
+        self.dir_btn.pack(fill=tk.X, padx=5, pady=2)
 
-        # Interval setting
-        ttk.Label(self.settings_frame, text="Save Interval (seconds):").grid(row=2, column=0, padx=5, pady=5)
+        # Interval Settings Frame
+        interval_frame = ttk.LabelFrame(self.settings_frame, text="Interval Settings")
+        interval_frame.pack(fill=tk.X, padx=5, pady=2)
+        self.interval_type = tk.StringVar(value="time")
+        ttk.Radiobutton(
+            interval_frame,
+            text="Time-based",
+            variable=self.interval_type,
+            value="time",
+            command=self._update_interval_label
+        ).pack(fill=tk.X, padx=5, pady=2)
+        
+        ttk.Radiobutton(
+            interval_frame,
+            text="Distance-based",
+            variable=self.interval_type,
+            value="distance",
+            command=self._update_interval_label
+        ).pack(fill=tk.X, padx=5, pady=2)
+
+        # Interval Value
+        self.interval_label = ttk.Label(interval_frame, text="Interval (seconds):")
+        self.interval_label.pack(fill=tk.X, padx=5, pady=(2,0))
+        
         self.interval_var = tk.StringVar(value="30")
-        self.interval_entry = ttk.Entry(self.settings_frame, textvariable=self.interval_var, width=10)
-        self.interval_entry.grid(row=2, column=1, sticky="w", padx=5, pady=5)
+        self.interval_entry = ttk.Entry(interval_frame, textvariable=self.interval_var)
+        self.interval_entry.pack(fill=tk.X, padx=5, pady=2)
+
 
         # Mask coordinates
-        ttk.Label(self.settings_frame, text="Mask (x1,y1,x2,y2):").grid(row=3, column=0, padx=5, pady=5)
+        ttk.Label(self.settings_frame, text="Mask (x1,y1,x2,y2):").pack(fill=tk.X, padx=5, pady=(2,0))
         self.mask_var = tk.StringVar(value="0,0,100,100")
-        self.mask_entry = ttk.Entry(self.settings_frame, textvariable=self.mask_var, width=20)
-        self.mask_entry.grid(row=3, column=1, sticky="w", padx=5, pady=5)
+        self.mask_entry = ttk.Entry(self.settings_frame, textvariable=self.mask_var)
+        self.mask_entry.pack(fill=tk.X, padx=5, pady=2)
         self.mask_btn = ttk.Button(self.settings_frame, text="Apply Mask", command=self._update_mask)
-        self.mask_btn.grid(row=3, column=2, padx=5, pady=5)
+        self.mask_btn.pack(fill=tk.X, padx=5, pady=2)
 
-        # Control frame
-        self.control_frame = ttk.Frame(self.root)
-        self.control_frame.pack(side=tk.TOP, fill=tk.X, padx=5, pady=5)
+        # Control Buttons Frame
+        self.control_frame = ttk.LabelFrame(self.left_menu, text="Controls", style='LeftMenu.TLabelframe')
+        self.control_frame.pack(fill=tk.X, padx=5, pady=2)
         
-        # Control buttons
-        self.start_btn = ttk.Button(self.control_frame, text="Start Camera", command=self._toggle_camera)
-        self.start_btn.pack(side=tk.LEFT, padx=5, pady=5)
+        # Start/Stop Button
+        self.start_btn = ttk.Button(
+            self.control_frame, 
+            text="Start Camera", 
+            command=self._toggle_camera
+        )
+        self.start_btn.pack(fill=tk.X, padx=5, pady=2)
 
-        self.exit_btn = ttk.Button(self.control_frame, text="Exit", command=self._exit_application)
-        self.exit_btn.pack(side=tk.RIGHT, padx=5, pady=5)
+        # Manual Capture Button
+        self.capture_btn = ttk.Button(
+            self.control_frame,
+            text="Manual Capture (C)",
+            command=lambda: self._manual_capture_callback() if self._manual_capture_callback else None
+        )
+        self.capture_btn.pack(fill=tk.X, padx=5, pady=2)
+
+        # Status Frame
+        self.status_frame = ttk.LabelFrame(self.left_menu, text="Status", style='LeftMenu.TLabelframe')
+        self.status_frame.pack(fill=tk.X, padx=5, pady=2)
 
         # GPS Status
-        self.gps_label = ttk.Label(self.control_frame, text="GPS: Not Connected")
-        self.gps_label.pack(side=tk.LEFT, padx=20, pady=5)
+        self.gps_label = ttk.Label(
+            self.status_frame, 
+            text="GPS: Not Connected",
+            wraplength=240
+        )
+        self.gps_label.pack(fill=tk.X, padx=5, pady=2)
 
-        # Display frame
-        self.display_frame = ttk.Frame(self.root)
-        self.display_frame.pack(side=tk.TOP, expand=True, fill=tk.BOTH, padx=5, pady=5)
+        # Motion Status
+        self.motion_label = ttk.Label(
+            self.status_frame,
+            text="Motion Status: Unknown",
+            wraplength=250
+        )
+        self.motion_label.pack(fill=tk.X, pady=5)
 
-        # Display labels
-        self.rgb_label = ttk.Label(self.display_frame)
-        self.rgb_label.grid(row=1, column=0, padx=5, pady=5)
+        # Exit Button
+        self.exit_btn = ttk.Button(
+            self.control_frame, 
+            text="Exit", 
+            command=self._exit_application
+        )
+        self.exit_btn.pack(fill=tk.X, padx=5, pady=2)
+
+    def _update_interval_label(self):
+        """Update interval label based on selected type"""
+        if self.interval_type.get() == "time":
+            self.interval_label.config(text="Interval (seconds):")
+        else:
+            self.interval_label.config(text="Interval (meters):")
+    
+    def get_interval_settings(self):
+        """Get current interval settings"""
+        return {
+            'type': self.interval_type.get(),
+            'value': float(self.interval_var.get())
+        }
+
+    def _setup_right_content(self):
+        """Setup right content with camera feeds in a compact layout"""
+        # Camera Feeds Container
+        self.feeds_container = ttk.Frame(self.right_content)
+        self.feeds_container.pack(expand=True, fill=tk.BOTH, padx=5, pady=5)
         
-        self.depth_label = ttk.Label(self.display_frame)
-        self.depth_label.grid(row=1, column=1, padx=5, pady=5)
+        # Configure grid with 2 columns
+        self.feeds_container.grid_columnconfigure((0, 1), weight=1, uniform="col")
+        self.feeds_container.grid_rowconfigure((0, 1), weight=1, uniform="row")
         
-        self.ir_label = ttk.Label(self.display_frame)
-        self.ir_label.grid(row=2, column=0, columnspan=2, padx=5, pady=5)
+        # Create camera feed labels with new grid layout
+        self.rgb_label = ttk.Label(self.feeds_container)
+        self.rgb_label.grid(row=0, column=0, columnspan=2, sticky="nsew", padx=2, pady=2)
+        
+        self.depth_label = ttk.Label(self.feeds_container)
+        self.depth_label.grid(row=1, column=0, sticky="nsew", padx=2, pady=2)
+        
+        self.ir_label = ttk.Label(self.feeds_container)
+        self.ir_label.grid(row=1, column=1, sticky="nsew", padx=2, pady=2)
 
-        ttk.Label(self.display_frame, text="RGB Feed").grid(row=0, column=0)
-        ttk.Label(self.display_frame, text="Depth Feed").grid(row=0, column=1)
-        ttk.Label(self.display_frame, text="IR Feed").grid(row=2, column=0, columnspan=2)
+    def update_frames(self, frames: Dict[str, Any]):
+        """Update camera feed displays with balanced scaling"""
+        container_width = self.feeds_container.winfo_width() - 10
+        container_height = (self.feeds_container.winfo_height() - 10) // 2  # Divide by 2 rows
+        
+        if 'rgb' in frames:
+            frame_rgb = cv2.cvtColor(frames['rgb'], cv2.COLOR_BGR2RGB)
+            # RGB gets full width
+            img_rgb = self._resize_frame_balanced(frame_rgb, container_width, container_height)
+            self.rgb_label.configure(image=img_rgb)
+            self.rgb_label.image = img_rgb
 
+        if 'depth' in frames:
+            frame_depth = cv2.cvtColor(frames['depth'], cv2.COLOR_BGR2RGB)
+            # Depth gets half width
+            img_depth = self._resize_frame_balanced(frame_depth, container_width // 2, container_height)
+            self.depth_label.configure(image=img_depth)
+            self.depth_label.image = img_depth
+
+        if 'ir' in frames:
+            frame_ir = cv2.cvtColor(frames['ir'], cv2.COLOR_GRAY2RGB)
+            # IR gets half width
+            img_ir = self._resize_frame_balanced(frame_ir, container_width // 2, container_height)
+            self.ir_label.configure(image=img_ir)
+            self.ir_label.image = img_ir
+
+    def _resize_frame_balanced(self, frame, target_width, target_height):
+        """Resize frame to fit target dimensions while maintaining aspect ratio"""
+        height, width = frame.shape[:2]
+        width_scale = target_width / width
+        height_scale = target_height / height
+        scale = min(width_scale, height_scale) * 0.95  # Use 95% of available space
+        
+        new_width = int(width * scale)
+        new_height = int(height * scale)
+        
+        frame = cv2.resize(frame, (new_width, new_height))
+        return ImageTk.PhotoImage(Image.fromarray(frame))
+    
+    def _resize_frame_compact(self, frame, target_width, target_height):
+        """Resize frame to fit target dimensions while maintaining aspect ratio"""
+        height, width = frame.shape[:2]
+        width_scale = target_width / width
+        height_scale = target_height / height
+        scale = min(width_scale, height_scale) * 0.9  # Use 90% of available space
+        
+        new_width = int(width * scale)
+        new_height = int(height * scale)
+        
+        frame = cv2.resize(frame, (new_width, new_height))
+        return ImageTk.PhotoImage(Image.fromarray(frame))
+    
+    def _toggle_fullscreen(self, event=None):
+        """Toggle fullscreen mode while maintaining minimum size"""
+        self.is_fullscreen = not self.is_fullscreen
+        self.root.attributes('-fullscreen', self.is_fullscreen)
+        
+        if not self.is_fullscreen:
+            # When exiting fullscreen, ensure window has good default size
+            screen_width = self.root.winfo_screenwidth()
+            screen_height = self.root.winfo_screenheight()
+            
+            # Set window size to 75% of screen size or minimum size, whichever is larger
+            default_width = max(int(screen_width * 0.75), 1024)
+            default_height = max(int(screen_height * 0.75), 768)
+            
+            # Calculate position to center the window
+            x = (screen_width - default_width) // 2
+            y = (screen_height - default_height) // 2
+            
+            # Set size and position
+            self.root.geometry(f"{default_width}x{default_height}+{x}+{y}")
+            
+        return "break"  # Prevent the event from propagating
+        
+    def show_capture_notification(self, message: str):
+        """Show temporary capture notification"""
+        if hasattr(self, 'notification_label'):
+            self.notification_label.destroy()
+            
+        self.notification_label = ttk.Label(
+            self.status_frame,
+            text=message,
+            foreground='green'
+        )
+        self.notification_label.pack(fill=tk.X, padx=5, pady=2)
+    
+        # Schedule notification removal after 2 seconds
+        self.root.after(2000, lambda: self.notification_label.destroy() if hasattr(self, 'notification_label') else None)
+
+    def update_motion_status(self, is_moving: bool):
+        """Update motion status display"""
+        status = "Moving" if is_moving else "Stopped"
+        color = "green" if is_moving else "red"
+        self.motion_label.config(
+            text=f"Motion Status: {status}",
+            foreground=color
+        )
+        
     def set_callbacks(self,
-                     start_callback: Callable = None,
-                     stop_callback: Callable = None,
-                     mask_callback: Callable = None,
-                     directory_callback: Callable = None,
-                     device_select_callback: Callable = None,
-                     refresh_devices_callback: Callable = None,
-                     gps_toggle_callback: Callable = None):
+                    start_callback: Callable = None,
+                    stop_callback: Callable = None,
+                    mask_callback: Callable = None,
+                    directory_callback: Callable = None,
+                    device_select_callback: Callable = None,
+                    refresh_devices_callback: Callable = None,
+                    gps_toggle_callback: Callable = None):
         """Set callback functions"""
         self.start_callback = start_callback
         self.stop_callback = stop_callback
@@ -140,6 +359,10 @@ class UIManager:
         self.refresh_devices_callback = refresh_devices_callback
         self.gps_toggle_callback = gps_toggle_callback
 
+    def set_manual_capture_callback(self, callback: Callable):
+        """Set callback for manual capture"""
+        self._manual_capture_callback = callback
+    
     def _on_device_selected(self, event=None):
         """Handle device selection"""
         if self.device_select_callback and self.device_var.get():
@@ -155,11 +378,8 @@ class UIManager:
 
     def _update_device_list(self):
         """Update the device dropdown list"""
-        device_list = []
-        for device in self.available_devices:
-            # Create a readable device name
-            device_name = f"OAK {device.getMxId()} ({device.state.name})"
-            device_list.append(device_name)
+        device_list = [f"OAK {device.getMxId()} ({device.state.name})" 
+                    for device in self.available_devices]
         
         self.device_combo['values'] = device_list
         if device_list:
@@ -201,12 +421,12 @@ class UIManager:
                     messagebox.showerror("Error", "Please select a device first")
                     return
 
-                interval = int(self.interval_var.get())
-                if interval < 1:
+                interval_settings = self.get_interval_settings()
+                if interval_settings['value'] < 1:
                     raise ValueError("Interval must be at least 1 second")
                 
                 if self.start_callback:
-                    self.start_callback(interval)
+                    self.start_callback(interval_settings)  # Pass the dictionary
                     
                 self.running = True
                 self.start_btn.config(text="Stop Camera")
@@ -227,8 +447,8 @@ class UIManager:
         self.dir_entry.config(state='disabled')
         self.dir_btn.config(state='disabled')
         self.interval_entry.config(state='disabled')
-        self.mask_entry.config(state='disabled')
-        self.mask_btn.config(state='disabled')
+        # self.mask_entry.config(state='disabled')
+        # self.mask_btn.config(state='disabled')
         self.device_combo.config(state='disabled')
         self.refresh_btn.config(state='disabled')
 
@@ -237,8 +457,8 @@ class UIManager:
         self.dir_entry.config(state='normal')
         self.dir_btn.config(state='normal')
         self.interval_entry.config(state='normal')
-        self.mask_entry.config(state='normal')
-        self.mask_btn.config(state='normal')
+        # self.mask_entry.config(state='normal')
+        # self.mask_btn.config(state='normal')
         self.device_combo.config(state='readonly')
         self.refresh_btn.config(state='normal')
         
