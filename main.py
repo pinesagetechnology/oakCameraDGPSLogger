@@ -223,6 +223,7 @@ class MainApplication:
                     continue
                 
                 # Capture if conditions are met
+                print(f"Should capture: {should_capture} | distance {distance_moved}")
                 if should_capture:
                     # Get current frames from camera
                     frames = {
