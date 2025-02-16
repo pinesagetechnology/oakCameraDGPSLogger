@@ -38,14 +38,17 @@ class CameraManager:
         try:
             with dai.Device(device_info) as device:
                 cameras = device.getConnectedCameras()
+                sensors = device.getConnectedSensors()
                 usb_speed = device.getUsbSpeed()
-                imu_data = device.hasIMU()
+                
+                # Check IMU using sensors list
+                has_imu = dai.IMUSensor.ACCELEROMETER_RAW in sensors
                 
                 return {
                     'name': device_info.getMxId(),
                     'cameras': [str(cam) for cam in cameras],
                     'usb_speed': str(usb_speed),
-                    'has_imu': imu_data,
+                    'has_imu': has_imu,
                     'state': device_info.state,
                     'protocol': device_info.protocol
                 }
