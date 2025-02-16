@@ -206,6 +206,8 @@ class MainApplication:
                 if self.gps is not None:
                     if self.interval_type == "distance":
                         distance_moved, coords = self.gps.get_distance_moved()
+                        print(f"Distance moved: {distance_moved}")
+                        print(f"Interval: {self.interval_value}")
                         if distance_moved >= self.interval_value:
                             should_capture = True
                             # Reset last position after capture
