@@ -128,21 +128,21 @@ class UIManager:
         interval_frame = ttk.LabelFrame(self.settings_frame, text="Interval Settings")
         interval_frame.pack(fill=tk.X, padx=5, pady=2)
         self.interval_type = tk.StringVar(value="time")
-            ttk.Radiobutton(
-                interval_frame,
-                text="Time-based",
-                variable=self.interval_type,
-                value="time",
-                command=self._update_interval_label
-            ).pack(fill=tk.X, padx=5, pady=2)
-            
-            ttk.Radiobutton(
-                interval_frame,
-                text="Distance-based",
-                variable=self.interval_type,
-                value="distance",
-                command=self._update_interval_label
-            ).pack(fill=tk.X, padx=5, pady=2)
+        ttk.Radiobutton(
+            interval_frame,
+            text="Time-based",
+            variable=self.interval_type,
+            value="time",
+            command=self._update_interval_label
+        ).pack(fill=tk.X, padx=5, pady=2)
+        
+        ttk.Radiobutton(
+            interval_frame,
+            text="Distance-based",
+            variable=self.interval_type,
+            value="distance",
+            command=self._update_interval_label
+        ).pack(fill=tk.X, padx=5, pady=2)
 
         # Interval Value
         self.interval_label = ttk.Label(interval_frame, text="Interval (seconds):")
