@@ -17,8 +17,8 @@ class UIManager:
         # Set initial window size if not fullscreen
         self.root.geometry("1280x960")
         
-        # Set fullscreen
-        self.root.attributes('-fullscreen', True)
+        # Make window resizable
+        self.root.resizable(True, True)
         
         # Bind Escape key to toggle fullscreen
         self.root.bind('<Escape>', self._toggle_fullscreen)
@@ -124,11 +124,34 @@ class UIManager:
         self.dir_btn = ttk.Button(self.settings_frame, text="Browse", command=self._select_directory)
         self.dir_btn.pack(fill=tk.X, padx=5, pady=2)
 
-        # Save Interval
-        ttk.Label(self.settings_frame, text="Save Interval (seconds):").pack(fill=tk.X, padx=5, pady=(2,0))
+        # Interval Settings Frame
+        interval_frame = ttk.LabelFrame(self.settings_frame, text="Interval Settings")
+        interval_frame.pack(fill=tk.X, padx=5, pady=2)
+        self.interval_type = tk.StringVar(value="time")
+            ttk.Radiobutton(
+                interval_frame,
+                text="Time-based",
+                variable=self.interval_type,
+                value="time",
+                command=self._update_interval_label
+            ).pack(fill=tk.X, padx=5, pady=2)
+            
+            ttk.Radiobutton(
+                interval_frame,
+                text="Distance-based",
+                variable=self.interval_type,
+                value="distance",
+                command=self._update_interval_label
+            ).pack(fill=tk.X, padx=5, pady=2)
+
+        # Interval Value
+        self.interval_label = ttk.Label(interval_frame, text="Interval (seconds):")
+        self.interval_label.pack(fill=tk.X, padx=5, pady=(2,0))
+        
         self.interval_var = tk.StringVar(value="30")
-        self.interval_entry = ttk.Entry(self.settings_frame, textvariable=self.interval_var)
+        self.interval_entry = ttk.Entry(interval_frame, textvariable=self.interval_var)
         self.interval_entry.pack(fill=tk.X, padx=5, pady=2)
+
 
         # Mask coordinates
         ttk.Label(self.settings_frame, text="Mask (x1,y1,x2,y2):").pack(fill=tk.X, padx=5, pady=(2,0))
@@ -185,6 +208,20 @@ class UIManager:
             command=self._exit_application
         )
         self.exit_btn.pack(fill=tk.X, padx=5, pady=2)
+
+    def _update_interval_label(self):
+        """Update interval label based on selected type"""
+        if self.interval_type.get() == "time":
+            self.interval_label.config(text="Interval (seconds):")
+        else:
+            self.interval_label.config(text="Interval (meters):")
+    
+    def get_interval_settings(self):
+        """Get current interval settings"""
+        return {
+            'type': self.interval_type.get(),
+            'value': float(self.interval_var.get())
+        }
 
     def _setup_right_content(self):
         """Setup right content with camera feeds in a compact layout"""

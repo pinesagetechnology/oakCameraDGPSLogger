@@ -14,6 +14,9 @@ class MainApplication:
         self.root = tk.Tk()
         self.ui = UIManager(self.root)
         self.camera = CameraManager()
+        self.interval_type = "time"
+        self.interval_value = 30
+        self.distance_moved = 0
         # Initialize GPS since it's enabled by default
         try:
             self.gps = GPSManager()
@@ -81,12 +84,16 @@ class MainApplication:
         device_details = self.camera.get_device_info(device_info)
         self.ui.update_device_info(device_details)
         
-    def start_system(self, interval: int):
+    def start_system(self, interval_settings: dict):
         """Start camera and GPS systems"""
         if not self.selected_device:
             raise ValueError("Please select a device first")
             
         try:
+            # Update interval settings
+            self.interval_type = interval_settings['type']
+            self.interval_value = interval_settings['value']
+            
             # Start GPS if enabled
             if self.gps is not None:
                 try:
@@ -103,10 +110,6 @@ class MainApplication:
                 device_info_callback=self.ui.update_device_info
             )
             
-            self.ui.set_manual_capture_callback(self.manual_capture)
-            
-            # Set up saving
-            self.save_interval = interval
             self.running = True
             self.save_thread = threading.Thread(target=self._save_loop)
             self.save_thread.daemon = True
@@ -194,21 +197,31 @@ class MainApplication:
     def _save_loop(self):
         """Loop for saving frames and GPS data"""
         while self.running:
-            current_time = time.time()
-            
-            if current_time - self.last_save_time >= self.save_interval:
-                try:
-                    # Get GPS coordinates if available
-                    coords = None
-                    if self.gps is not None:
+            try:
+                current_time = time.time()
+                should_capture = False
+                
+                # Get GPS coordinates if available
+                coords = None
+                if self.gps is not None:
+                    if self.interval_type == "distance":
+                        distance_moved, coords = self.gps.get_distance_moved()
+                        if distance_moved >= self.interval_value:
+                            should_capture = True
+                            # Reset last position after capture
+                            self.gps.last_position = coords
+                    else:  # time-based interval
                         coords = self.gps.get_current_location()
-                    
-                    # Check if vehicle is moving
-                    if coords and not self.check_motion(coords):
-                        self.last_save_time = current_time
-                        time.sleep(0.1)
-                        continue
-                    
+                        if current_time - self.last_save_time >= self.interval_value:
+                            should_capture = True
+                
+                # Check if vehicle is moving
+                if coords and not self.check_motion(coords):
+                    time.sleep(0.1)
+                    continue
+                
+                # Capture if conditions are met
+                if should_capture:
                     # Get current frames from camera
                     frames = {
                         'rgb': self.camera.q_rgb.get().getCvFrame(),
@@ -225,10 +238,10 @@ class MainApplication:
                         capture_type="auto"
                     )
                     self.last_save_time = current_time
-                        
-                except Exception as e:
-                    print(f"Error in save loop: {str(e)}")
                     
+            except Exception as e:
+                print(f"Error in save loop: {str(e)}")
+                
             time.sleep(0.1)  # Prevent busy waiting
             
     def run(self):
