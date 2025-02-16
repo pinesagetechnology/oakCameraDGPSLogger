@@ -38,12 +38,11 @@ class CameraManager:
         try:
             with dai.Device(device_info) as device:
                 cameras = device.getConnectedCameras()
-                sensors = device.getSensorNames()
                 usb_speed = device.getUsbSpeed()
-                
-                # Check IMU using sensors list
-                has_imu = 'IMU' in sensors
-                
+
+                # Check if IMU is available
+                has_imu = device.getConnectedIMU() is not None
+
                 return {
                     'name': device_info.getMxId(),
                     'cameras': [str(cam) for cam in cameras],
