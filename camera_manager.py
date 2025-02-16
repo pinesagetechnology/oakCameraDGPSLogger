@@ -39,10 +39,10 @@ class CameraManager:
             with dai.Device(device_info) as device:
                 cameras = device.getConnectedCameras()
                 usb_speed = device.getUsbSpeed()
-
-                # Check if IMU is available
-                has_imu = device.getConnectedIMU() is not None
-
+                
+                # For OAK-D PoE, we know it has IMU
+                has_imu = True
+                
                 return {
                     'name': device_info.getMxId(),
                     'cameras': [str(cam) for cam in cameras],
