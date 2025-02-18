@@ -9,6 +9,7 @@ from gps_manager import GPSManager
 from storage_manager import StorageManager
 import cv2
 import numpy as np
+import os
 
 class MainApplication:
     def __init__(self):
@@ -218,61 +219,75 @@ class MainApplication:
                 if self.gps is not None:
                     if self.interval_type == "distance":
                         distance_moved, coords = self.gps.get_distance_moved()
-                        if distance_moved >= self.interval_value:
-                            should_capture = True
+                        should_capture = distance_moved >= self.interval_value
+                        if should_capture:
                             self.gps.last_position = coords
                     else:
                         coords = self.gps.get_current_location()
-                        if (current_time - self.last_save_time) >= self.interval_value:
-                            should_capture = True
+                        should_capture = (current_time - self.last_save_time) >= self.interval_value
                 else:
                     # If no GPS, only do time-based
-                    if self.interval_type == "time" and (current_time - self.last_save_time) >= self.interval_value:
-                        should_capture = True
+                    should_capture = self.interval_type == "time" and (current_time - self.last_save_time) >= self.interval_value
 
-                # Optionally check if we are moving (if that matters)
+                # Check motion status if we have GPS coordinates
                 if coords and not self.check_motion(coords):
-                    # If not moving, skip capture or handle it differently
                     time.sleep(0.1)
                     continue
 
                 if should_capture:
                     frames = {}
-                    if self.camera.q_rgb_video:
-                        rgb_packet = self.camera.q_rgb_video.tryGet()
-                        if rgb_packet is not None:
-                            frames['rgb'] = rgb_packet.getCvFrame()
-                        # frames['rgb'] = self.camera.q_rgb_video.tryGet().getCvFrame()
-                    
-                    if self.camera.q_depth:
-                        depth_data = self.camera.q_depth.tryGet()
-                        if depth_data is not None:
-                            raw_depth = depth_data.getFrame()  # 16-bit
-                            depth_8 = cv2.normalize(raw_depth, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
-                            frames['depth'] = cv2.applyColorMap(depth_8, cv2.COLORMAP_JET)
-                            frames['depth_raw'] = raw_depth
+                    save_success = False
 
-                    if self.camera.q_left:
-                        ir_packet = self.camera.q_left.tryGet()
-                        if ir_packet is not None:
-                            ir_data = ir_packet.getCvFrame()
+                    # Try to get each frame type
+                    try:
+                        if self.camera.q_rgb_video:
+                            frames['rgb'] = self.camera.q_rgb_video.get().getCvFrame()
+                    except Exception as e:
+                        print(f"Error capturing RGB frame: {str(e)}")
+
+                    try:
+                        if self.camera.q_depth:
+                            depth_data = self.camera.q_depth.get()
+                            depth_raw = depth_data.getFrame()  # 16-bit
+                            depth_8 = cv2.normalize(depth_raw, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
+                            frames['depth'] = cv2.applyColorMap(depth_8, cv2.COLORMAP_JET)
+                            # Save raw as well if needed
+                            frames['depth_raw'] = depth_raw
+                    except Exception as e:
+                        print(f"Error capturing depth frame: {str(e)}")
+
+                    try:
+                        if self.camera.q_left:
+                            ir_data = self.camera.q_left.get().getCvFrame()
                             ir_data = cv2.normalize(ir_data, None, 0, 255, cv2.NORM_MINMAX)
                             ir_data = cv2.equalizeHist(ir_data)
                             frames['ir'] = ir_data
+                    except Exception as e:
+                        print(f"Error capturing IR frame: {str(e)}")
 
-                    self.storage.save_frames_with_metadata(
-                        frames=frames,
-                        metadata=coords if coords else {"gps": "disabled"},
-                        timestamp=datetime.now(),
-                        capture_type="auto"
-                    )
-                    self.last_save_time = current_time
+                    # Only save if we have at least one frame
+                    if frames:
+                        try:
+                            saved_files = self.storage.save_frames_with_metadata(
+                                frames=frames,
+                                metadata=coords if coords else {"gps": "disabled"},
+                                timestamp=datetime.now(),
+                                capture_type="auto"
+                            )
+                            save_success = True
+                            print(f"Saved frames: {', '.join([os.path.basename(f) for f in saved_files])}")
+                        except Exception as e:
+                            print(f"Error saving frames: {str(e)}")
+
+                    if save_success:
+                        self.last_save_time = current_time
+
+                time.sleep(0.1)
 
             except Exception as e:
                 print(f"Error in save loop: {str(e)}")
-
-            time.sleep(0.1)
-
+                time.sleep(0.1)
+            
     def run(self):
         """Start the Tkinter main loop."""
         self.root.protocol("WM_DELETE_WINDOW", self.ui._exit_application)
