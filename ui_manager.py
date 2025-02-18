@@ -389,7 +389,7 @@ class UIManager:
     def update_device_info(self, info: Dict):
         """Update device information display"""
         if info:
-            info_text = f"Cameras: {', '.join(info['cameras'])} | USB: {info['usb_speed']}"
+            info_text = f"Cameras: {', '.join(info['cameras'])}"
             self.device_info_label.config(text=info_text)
         else:
             self.device_info_label.config(text="No device selected")
@@ -482,26 +482,6 @@ class UIManager:
             self.gps_label.config(text=status)
         else:
             self.gps_label.config(text="GPS: No Fix")
-
-    def update_frames(self, frames: Dict[str, Any]):
-        """Update camera feed displays"""
-        if 'rgb' in frames:
-            frame_rgb = cv2.cvtColor(frames['rgb'], cv2.COLOR_BGR2RGB)
-            img_rgb = ImageTk.PhotoImage(Image.fromarray(frame_rgb))
-            self.rgb_label.configure(image=img_rgb)
-            self.rgb_label.image = img_rgb
-
-        if 'depth' in frames:
-            frame_depth = cv2.cvtColor(frames['depth'], cv2.COLOR_BGR2RGB)
-            img_depth = ImageTk.PhotoImage(Image.fromarray(frame_depth))
-            self.depth_label.configure(image=img_depth)
-            self.depth_label.image = img_depth
-
-        if 'ir' in frames:
-            frame_ir = cv2.cvtColor(frames['ir'], cv2.COLOR_GRAY2RGB)
-            img_ir = ImageTk.PhotoImage(Image.fromarray(frame_ir))
-            self.ir_label.configure(image=img_ir)
-            self.ir_label.image = img_ir
 
     def _exit_application(self):
         """Handle application exit"""
