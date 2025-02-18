@@ -108,11 +108,10 @@ class CameraManager:
         stereo.setDepthAlign(dai.CameraBoardSocket.RGB)
         stereo.setMedianFilter(dai.StereoDepthProperties.MedianFilter.KERNEL_5x5)
         config = stereo.initialConfig.get()
-        config.postProcessing.decimationFilter.decimationFactor = 1
         config.postProcessing.speckleFilter.enable = True
-        config.postProcessing.speckleFilter.speckleRange = 50
+        config.postProcessing.speckleFilter.speckleRange = 12
         config.postProcessing.temporalFilter.enable = True
-        config.postProcessing.decimationFilter.decimationFactor = 1
+        config.postProcessing.decimationFilter.decimationFactor = 2
         config.postProcessing.thresholdFilter.minRange = 400
         config.postProcessing.thresholdFilter.maxRange = 8000
         stereo.initialConfig.set(config)
