@@ -187,3 +187,68 @@ class StorageManager:
             'file_count': file_count,
             'base_path': self.base_path
         }
+
+    def start_video_recording(self, video_path: str) -> dict:
+        """
+        Initialize video writers for RGB, Depth, and IR streams
+        Returns dictionary of video writers
+        """
+        # Create date-based subdirectory
+        timestamp = datetime.now()
+        date_subdir = timestamp.strftime("%Y%m%d")
+        video_subdir = os.path.join(video_path, date_subdir)
+        
+        if not os.path.exists(video_subdir):
+            os.makedirs(video_subdir)
+        
+        time_str = timestamp.strftime("%H%M%S")
+        video_writers = {}
+        
+        # Define video formats and paths
+        formats = {
+            'rgb': {
+                'path': os.path.join(video_subdir, f'rgb_{time_str}.avi'),
+                'fourcc': cv2.VideoWriter_fourcc(*'XVID'),
+                'fps': 30,
+                'size': (1280, 720)
+            },
+            'depth': {
+                'path': os.path.join(video_subdir, f'depth_{time_str}.avi'),
+                'fourcc': cv2.VideoWriter_fourcc(*'XVID'),
+                'fps': 30,
+                'size': (1280, 720)
+            },
+            'ir': {
+                'path': os.path.join(video_subdir, f'ir_{time_str}.avi'),
+                'fourcc': cv2.VideoWriter_fourcc(*'XVID'),
+                'fps': 30,
+                'size': (1280, 720)
+            }
+        }
+        
+        # Create video writers
+        for stream, config in formats.items():
+            video_writers[stream] = cv2.VideoWriter(
+                config['path'],
+                config['fourcc'],
+                config['fps'],
+                config['size']
+            )
+        
+        return video_writers
+
+    def stop_video_recording(self, video_writers: dict):
+        """Release all video writers"""
+        for writer in video_writers.values():
+            if writer is not None:
+                writer.release()
+
+    def set_video_path(self, path: str):
+        """Set path for video storage"""
+        if not os.path.exists(path):
+            os.makedirs(path)
+        self.video_path = path
+
+    def get_video_path(self) -> str:
+        """Get current video storage path"""
+        return getattr(self, 'video_path', os.path.join(self.base_path, 'videos'))

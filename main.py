@@ -21,6 +21,12 @@ class MainApplication:
         self.interval_value = 30
         self.distance_moved = 0
 
+        self.recording_state = {
+            'active': False,
+            'type': None,  # 'interval' or 'continuous'
+            'video': False
+        }
+
         # Initialize GPS
         try:
             self.gps = GPSManager()
@@ -34,6 +40,12 @@ class MainApplication:
         self.gps_threshold = 0.0001  # ~11 meters threshold
         self.is_moving = False
 
+        # Initialize video path
+        video_path = os.path.join(self.storage.get_base_path(), 'videos')
+        if not os.path.exists(video_path):
+            os.makedirs(video_path)
+        self.ui.video_dir_var.set(video_path)
+
         # Set up UI callbacks
         self.ui.set_callbacks(
             start_callback=self.start_system,
@@ -42,7 +54,8 @@ class MainApplication:
             directory_callback=self.update_directory,
             device_select_callback=self.select_device,
             refresh_devices_callback=self.refresh_devices,
-            gps_toggle_callback=self.toggle_gps
+            gps_toggle_callback=self.toggle_gps,
+            video_callback=self.toggle_recording
         )
 
         self.running = False
@@ -125,11 +138,16 @@ class MainApplication:
 
     def stop_system(self):
         """Stop camera and GPS systems."""
+        # Stop recording if active
+        if self.recording_state['active']:
+            self.toggle_recording(self.recording_state['type'], False)
+            
         self.running = False
         if self.save_thread:
             self.save_thread.join(timeout=1.0)
 
         self.camera.stop_camera()
+        self.ui.control_btn.config(text="Start Camera")  # Update button text
 
         if self.gps is not None:
             self.gps.stop_gps()
@@ -139,8 +157,15 @@ class MainApplication:
         self.camera.set_mask(coords)
 
     def update_directory(self, path: str):
-        """Update storage directory."""
+        """Update storage directory"""
         self.storage.set_base_path(path)
+        # Update video path as well
+        video_path = os.path.join(path, 'videos')
+        if not os.path.exists(video_path):
+            os.makedirs(video_path)
+        self.storage.set_video_path(video_path)
+        self.ui.video_dir_var.set(video_path)
+
 
     def manual_capture(self, event=None):
         """Handle manual capture when 'C' key is pressed."""
@@ -292,7 +317,51 @@ class MainApplication:
             except Exception as e:
                 print(f"Error in save loop: {str(e)}")
                 time.sleep(0.1)
-            
+
+    def toggle_recording(self, record_type='interval', include_video=False):
+        """
+        Toggle recording state
+        :param record_type: 'interval' or 'continuous'
+        :param include_video: whether to record video
+        """
+        if not self.recording_state['active']:
+            # Start recording
+            try:
+                if include_video:
+                    video_path = self.ui.video_dir_var.get()
+                    if not os.path.exists(video_path):
+                        os.makedirs(video_path)
+                    self.camera.video_writers = self.storage.start_video_recording(video_path)
+                
+                self.recording_state = {
+                    'active': True,
+                    'type': record_type,
+                    'video': include_video
+                }
+                
+                self.last_save_time = time.time()
+                self.ui.show_capture_notification(
+                    f"Started {'video ' if include_video else ''}recording ({record_type})"
+                )
+                                
+            except Exception as e:
+                self.ui.show_error("Recording Error", f"Failed to start recording: {str(e)}")
+                self.recording_state['active'] = False
+                
+        else:
+            # Stop recording
+            if self.recording_state['video']:
+                if self.camera.video_writers:
+                    self.storage.stop_video_recording(self.camera.video_writers)
+                    self.camera.video_writers = None
+                    
+            self.recording_state = {
+                'active': False,
+                'type': None,
+                'video': False
+            }
+            self.ui.show_capture_notification("Stopped recording")
+
     def run(self):
         """Start the Tkinter main loop."""
         self.root.protocol("WM_DELETE_WINDOW", self.ui._exit_application)
