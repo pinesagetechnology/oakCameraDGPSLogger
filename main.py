@@ -149,8 +149,11 @@ class MainApplication:
                 # Get current frames from camera queues
                 # Use blocking get() to retrieve the most recent frames
                 frames = {}
-                if self.camera.q_rgb_video:
-                    frames['rgb'] = self.camera.q_rgb_video.get().getCvFrame()
+                if self.camera.latest_rgb_video is not None: 
+                    frames['rgb'] = self.camera.latest_rgb_video 
+                else: 
+                    print("Warning: No high-res RGB frame available for capture.")
+
                 if self.camera.q_depth:
                     depth_data = self.camera.q_depth.get()
                     depth_raw = depth_data.getFrame()  # 16-bit
@@ -240,8 +243,10 @@ class MainApplication:
 
                     # Try to get each frame type
                     try:
-                        if self.camera.q_rgb_video:
-                            frames['rgb'] = self.camera.q_rgb_video.get().getCvFrame()
+                        if self.camera.latest_rgb_video is not None: 
+                            frames['rgb'] = self.camera.latest_rgb_video 
+                        else: 
+                            print("Warning: No high-res RGB frame available for capture.")
                     except Exception as e:
                         print(f"Error capturing RGB frame: {str(e)}")
 

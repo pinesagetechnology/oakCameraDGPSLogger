@@ -20,6 +20,7 @@ class CameraManager:
         self.device_info_callback = None
 
         # Queues for frames. Created after pipeline/device is started
+        self.latest_rgb_video = None
         self.q_rgb_preview = None
         self.q_rgb_video = None
         self.q_depth = None
@@ -215,6 +216,10 @@ class CameraManager:
                     frame_rgb = in_rgb.getCvFrame()
                     frame_rgb = self.apply_mask(frame_rgb)
                     frames['rgb'] = frame_rgb
+
+                # Drain the high-res RGB video stream and store the latest frame
+                if in_rgb_video := self.q_rgb_video.tryGet():
+                    self.latest_rgb_video = in_rgb_video.getCvFrame()
 
                 if in_depth := self.q_depth.tryGet():
                     # Depth is 16-bit data. We can colorize it for display:
