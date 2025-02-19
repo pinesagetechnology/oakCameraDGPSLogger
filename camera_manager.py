@@ -209,8 +209,16 @@ class CameraManager:
 
     def _update_camera(self):
         """ Continuously read frames from the queues and pass them to the callback. """
+        last_write_time = time.time()
+        frame_interval = 1.0 / 15  # For 15 FPS
+
         while self.running:
             try:
+                current_time = time.time()
+                if current_time - last_write_time < frame_interval:
+                    time.sleep(0.001)
+                    continue
+
                 frames = {}
 
                 if in_rgb := self.q_rgb_preview.tryGet():
@@ -249,33 +257,32 @@ class CameraManager:
 
                 if self.running and hasattr(self, 'video_writers') and self.video_writers:
                     try:
-                        # Use high-res RGB video frame for recording
                         if self.latest_rgb_video is not None and self.video_writers.get('rgb'):
                             self.video_writers['rgb'].write(self.latest_rgb_video)
                             
                         if in_depth and self.video_writers.get('depth'):
-                            # Use colorized depth for recording
                             depth_frame_16 = in_depth.getFrame()
                             depth_frame_8 = cv2.normalize(depth_frame_16, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
                             colorized_depth = cv2.applyColorMap(depth_frame_8, cv2.COLORMAP_JET)
                             self.video_writers['depth'].write(colorized_depth)
                             
                         if in_left and self.video_writers.get('ir'):
-                            # Process and record IR frame
                             ir_frame = in_left.getCvFrame()
                             ir_frame = cv2.normalize(ir_frame, None, 0, 255, cv2.NORM_MINMAX)
                             ir_frame = cv2.equalizeHist(ir_frame)
                             ir_bgr = cv2.cvtColor(ir_frame, cv2.COLOR_GRAY2BGR)
                             self.video_writers['ir'].write(ir_bgr)
+                        
+                        last_write_time = current_time  # Update timestamp after successful write
                     except Exception as e:
                         print(f"Error writing video frames: {str(e)}")
-                        
+
+                time.sleep(0.001)  # Small sleep to prevent CPU overload
+
             except Exception as e:
                 print(f"Error in camera update: {str(e)}")
                 time.sleep(1)
                 continue
-
-            time.sleep(0.001)
 
     def stop_camera(self):
         """ Stop camera and clean up resources. """
