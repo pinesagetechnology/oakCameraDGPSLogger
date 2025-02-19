@@ -124,6 +124,14 @@ class UIManager:
         self.dir_btn = ttk.Button(self.settings_frame, text="Browse", command=self._select_directory)
         self.dir_btn.pack(fill=tk.X, padx=5, pady=2)
 
+        # Video Save Directory
+        ttk.Label(self.settings_frame, text="Video Save Directory:").pack(fill=tk.X, padx=5, pady=(2,0))
+        self.video_dir_var = tk.StringVar(value=os.path.join(os.getcwd(), "videos"))
+        self.video_dir_entry = ttk.Entry(self.settings_frame, textvariable=self.video_dir_var)
+        self.video_dir_entry.pack(fill=tk.X, padx=5, pady=2)
+        self.video_dir_btn = ttk.Button(self.settings_frame, text="Browse Video Path", command=self._select_video_directory)
+        self.video_dir_btn.pack(fill=tk.X, padx=5, pady=2)
+
         # Interval Settings Frame
         interval_frame = ttk.LabelFrame(self.settings_frame, text="Interval Settings")
         interval_frame.pack(fill=tk.X, padx=5, pady=2)
@@ -166,12 +174,12 @@ class UIManager:
         self.control_frame.pack(fill=tk.X, padx=5, pady=2)
         
         # Start/Stop Button
-        self.start_btn = ttk.Button(
-            self.control_frame, 
-            text="Start Camera", 
-            command=self._toggle_camera
+        self.control_btn = ttk.Button(
+            self.control_frame,
+            text="Start Camera",
+            command=self._toggle_camera_and_recording
         )
-        self.start_btn.pack(fill=tk.X, padx=5, pady=2)
+        self.control_btn.pack(fill=tk.X, padx=5, pady=2)
 
         # Manual Capture Button
         self.capture_btn = ttk.Button(
@@ -349,7 +357,8 @@ class UIManager:
                     directory_callback: Callable = None,
                     device_select_callback: Callable = None,
                     refresh_devices_callback: Callable = None,
-                    gps_toggle_callback: Callable = None):
+                    gps_toggle_callback: Callable = None,
+                    video_callback: Callable = None): 
         """Set callback functions"""
         self.start_callback = start_callback
         self.stop_callback = stop_callback
@@ -358,6 +367,7 @@ class UIManager:
         self.device_select_callback = device_select_callback
         self.refresh_devices_callback = refresh_devices_callback
         self.gps_toggle_callback = gps_toggle_callback
+        self.video_callback = video_callback  
 
     def set_manual_capture_callback(self, callback: Callable):
         """Set callback for manual capture"""
@@ -412,35 +422,6 @@ class UIManager:
                 self.mask_callback(coords)
         except Exception as e:
             messagebox.showerror("Error", f"Invalid mask coordinates: {str(e)}")
-
-    def _toggle_camera(self):
-        """Handle camera toggle"""
-        if not self.running:
-            try:
-                if not self.device_var.get():
-                    messagebox.showerror("Error", "Please select a device first")
-                    return
-
-                interval_settings = self.get_interval_settings()
-                if interval_settings['value'] < 1:
-                    raise ValueError("Interval must be at least 1 second")
-                
-                if self.start_callback:
-                    self.start_callback(interval_settings)  # Pass the dictionary
-                    
-                self.running = True
-                self.start_btn.config(text="Stop Camera")
-                self._disable_settings()
-                
-            except ValueError as e:
-                messagebox.showerror("Error", str(e))
-        else:
-            if self.stop_callback:
-                self.stop_callback()
-                
-            self.running = False
-            self.start_btn.config(text="Start Camera")
-            self._enable_settings()
 
     def _disable_settings(self):
         """Disable settings while camera is running"""
@@ -500,3 +481,97 @@ class UIManager:
             return int(self.interval_var.get())
         except ValueError:
             return 30  # Default value
+
+    def _select_video_directory(self):
+        """Handle video directory selection"""
+        dir_path = filedialog.askdirectory(initialdir=self.video_dir_var.get())
+        if dir_path:
+            self.video_dir_var.set(dir_path)
+            # Create directory if it doesn't exist
+            if not os.path.exists(dir_path):
+                os.makedirs(dir_path)
+
+    def _toggle_camera_and_recording(self):
+        """Handle camera and recording toggle"""
+        if not self.running:
+            try:
+                if not self.device_var.get():
+                    messagebox.showerror("Error", "Please select a device first")
+                    return
+
+                # Show recording options dialog
+                self.recording_dlg = tk.Toplevel(self.root)
+                self.recording_dlg.title("Recording Options")
+                self.recording_dlg.geometry("300x200")
+                
+                # Recording type
+                type_frame = ttk.LabelFrame(self.recording_dlg, text="Recording Type")
+                type_frame.pack(fill=tk.X, padx=5, pady=5)
+                
+                record_type = tk.StringVar(value="interval")
+                ttk.Radiobutton(
+                    type_frame, 
+                    text="Interval-based", 
+                    variable=record_type, 
+                    value="interval"
+                ).pack(fill=tk.X, padx=5, pady=2)
+                
+                ttk.Radiobutton(
+                    type_frame, 
+                    text="Continuous", 
+                    variable=record_type, 
+                    value="continuous"
+                ).pack(fill=tk.X, padx=5, pady=2)
+                
+                # Video option
+                video_var = tk.BooleanVar(value=True)  # Default to true
+                ttk.Checkbutton(
+                    self.recording_dlg,
+                    text="Include Video Recording",
+                    variable=video_var
+                ).pack(fill=tk.X, padx=5, pady=5)
+                
+                # Get interval settings
+                interval_settings = self.get_interval_settings()
+                if interval_settings['value'] < 1:
+                    raise ValueError("Interval must be at least 1 second")
+
+                def start_camera_and_recording():
+                    if self.start_callback:
+                        self.start_callback(interval_settings)
+                    if self.video_callback:
+                        self.video_callback(
+                            record_type.get(),
+                            video_var.get()
+                        )
+                    self.running = True
+                    self.control_btn.config(text="Stop Camera")
+                    self._disable_settings()
+                    self.recording_dlg.destroy()
+                    
+                # Buttons
+                btn_frame = ttk.Frame(self.recording_dlg)
+                btn_frame.pack(fill=tk.X, padx=5, pady=5)
+                
+                ttk.Button(
+                    btn_frame,
+                    text="Start",
+                    command=start_camera_and_recording
+                ).pack(side=tk.LEFT, padx=5)
+                
+                ttk.Button(
+                    btn_frame,
+                    text="Cancel",
+                    command=self.recording_dlg.destroy
+                ).pack(side=tk.LEFT, padx=5)
+                
+                self.recording_dlg.protocol("WM_DELETE_WINDOW", lambda: [self.recording_dlg.destroy(), delattr(self, 'recording_dlg')])
+            except ValueError as e:
+                messagebox.showerror("Error", str(e))
+        else:
+            if self.stop_callback:
+                self.stop_callback()
+                
+            self.running = False
+            self.control_btn.config(text="Start Camera")
+            self._enable_settings()

@@ -18,7 +18,8 @@ class CameraManager:
         self.available_devices = []
         self.current_device_info = None
         self.device_info_callback = None
-
+        self.video_writers = None
+        
         # Queues for frames. Created after pipeline/device is started
         self.latest_rgb_video = None
         self.q_rgb_preview = None
@@ -245,6 +246,30 @@ class CameraManager:
                 # Send frames to the UI or whomever uses them
                 if frames and self.frame_callback:
                     self.frame_callback(frames)
+
+                if self.running and hasattr(self, 'video_writers') and self.video_writers:
+                    try:
+                        # Use high-res RGB video frame for recording
+                        if self.latest_rgb_video is not None and self.video_writers.get('rgb'):
+                            self.video_writers['rgb'].write(self.latest_rgb_video)
+                            
+                        if in_depth and self.video_writers.get('depth'):
+                            # Use colorized depth for recording
+                            depth_frame_16 = in_depth.getFrame()
+                            depth_frame_8 = cv2.normalize(depth_frame_16, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
+                            colorized_depth = cv2.applyColorMap(depth_frame_8, cv2.COLORMAP_JET)
+                            self.video_writers['depth'].write(colorized_depth)
+                            
+                        if in_left and self.video_writers.get('ir'):
+                            # Process and record IR frame
+                            ir_frame = in_left.getCvFrame()
+                            ir_frame = cv2.normalize(ir_frame, None, 0, 255, cv2.NORM_MINMAX)
+                            ir_frame = cv2.equalizeHist(ir_frame)
+                            ir_bgr = cv2.cvtColor(ir_frame, cv2.COLOR_GRAY2BGR)
+                            self.video_writers['ir'].write(ir_bgr)
+                    except Exception as e:
+                        print(f"Error writing video frames: {str(e)}")
+                        
             except Exception as e:
                 print(f"Error in camera update: {str(e)}")
                 time.sleep(1)
@@ -257,6 +282,13 @@ class CameraManager:
         self.running = False
         if self.camera_thread:
             self.camera_thread.join(timeout=1.0)
+
+        if self.video_writers:
+            for writer in self.video_writers.values():
+                if writer is not None:
+                    writer.release()
+            self.video_writers = None
+            
         if self.device:
             try:
                 self.device.close()
@@ -293,4 +325,9 @@ class CameraManager:
         return self.current_device_info
 
     def __del__(self):
+        if self.video_writers:
+            for writer in self.video_writers.values():
+                if writer is not None:
+                    writer.release()
         self.stop_camera()
+    
