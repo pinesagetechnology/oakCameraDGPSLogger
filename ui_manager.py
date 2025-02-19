@@ -9,7 +9,7 @@ import depthai as dai
 class UIManager:
     def __init__(self, root: tk.Tk):
         self.root = root
-        self.root.title("OAK-D Camera with GPS V1")
+        self.root.title("OAK-D Camera with GPS V1.1")
         
         # Set minimum window size (width x height)
         self.root.minsize(1024, 768)
