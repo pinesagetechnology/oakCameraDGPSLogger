@@ -209,19 +209,19 @@ class StorageManager:
             'rgb': {
                 'path': os.path.join(video_subdir, f'rgb_{time_str}.avi'),
                 'fourcc': cv2.VideoWriter_fourcc(*'XVID'),
-                'fps': 30,
+                'fps': 60,
                 'size': (1280, 720)
             },
             'depth': {
                 'path': os.path.join(video_subdir, f'depth_{time_str}.avi'),
                 'fourcc': cv2.VideoWriter_fourcc(*'XVID'),
-                'fps': 30,
+                'fps': 60,
                 'size': (1280, 720)
             },
             'ir': {
                 'path': os.path.join(video_subdir, f'ir_{time_str}.avi'),
                 'fourcc': cv2.VideoWriter_fourcc(*'XVID'),
-                'fps': 30,
+                'fps': 60,
                 'size': (1280, 720)
             }
         }
