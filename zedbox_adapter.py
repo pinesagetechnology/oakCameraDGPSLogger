@@ -92,75 +92,29 @@ def adapt_zed_to_main_app():
             instead of the original OAK-D camera and standard GPS.
             """
             def __init__(self):
-                # Initialize Tkinter root
-                self.root = tk.Tk()
-                self.ui = None  # Will be initialized later
+                # Initialize parent class first (this will set up the Tk root and UI)
+                super().__init__()
                 
-                # Use ZED camera manager instead of OAK-D
+                # Replace the OAK-D camera manager with the ZED camera manager
                 self.camera = ZEDCameraManager()
-
-                self.interval_type = "time"
-                self.interval_value = 30
-                self.distance_moved = 0
-
-                self.recording_state = {
-                    'active': False,
-                    'type': None,  # 'interval' or 'continuous'
-                    'video': False
-                }
-
-                # Initialize GPS with U-BLOX manager
+                
+                # Replace the GPS manager with the U-BLOX GPS manager
                 try:
+                    # Store the enabled state
+                    gps_enabled = True
+                    if hasattr(self, 'gps') and self.gps is not None:
+                        gps_enabled = self.ui.gps_enabled.get()
+                        self.gps.stop_gps()  # Stop the existing GPS manager
+                    
+                    # Create new U-BLOX GPS manager
                     self.gps = UBloxGPSManager()
+                    self.ui.set_gps_enabled(gps_enabled)
                 except Exception as e:
-                    print(f"Failed to initialize GPS: {str(e)}")
+                    print(f"Failed to initialize U-BLOX GPS: {str(e)}")
                     self.gps = None
-                    if self.ui:  # UI might not be initialized yet
-                        self.ui.set_gps_enabled(False)
-
-                # Initialize storage manager
-                from storage_manager import StorageManager
-                self.storage = StorageManager()
+                    self.ui.set_gps_enabled(False)
                 
-                self.last_gps_coords = None
-                self.gps_threshold = 0.0001  # ~11 meters threshold
-                self.is_moving = False
-
-                # Initialize UI manager
-                from ui_manager import UIManager
-                self.ui = UIManager(self.root)
-
-                # Initialize video path
-                video_path = os.path.join(self.storage.get_base_path(), 'videos')
-                if not os.path.exists(video_path):
-                    os.makedirs(video_path)
-                self.ui.video_dir_var.set(video_path)
-
-                # Set up UI callbacks
-                self.ui.set_callbacks(
-                    start_callback=self.start_system,
-                    stop_callback=self.stop_system,
-                    mask_callback=self.update_mask,
-                    directory_callback=self.update_directory,
-                    device_select_callback=self.select_device,
-                    refresh_devices_callback=self.refresh_devices,
-                    gps_toggle_callback=self.toggle_gps,
-                    video_callback=self.toggle_recording
-                )
-                
-                # Set manual capture callback
-                self.ui.set_manual_capture_callback(self.manual_capture)
-
-                self.running = False
-                self.last_save_time = 0
-                self.save_thread = None
-                self.selected_device = None
-
-                # Bind manual capture key
-                self.root.bind('c', self.manual_capture)
-                self.root.bind('C', self.manual_capture)
-
-                # Initial device refresh
+                # Refresh devices to show available ZED cameras
                 self.refresh_devices()
                 
             def toggle_gps(self, enabled: bool):
