@@ -4,3 +4,8 @@ pillow>=9.0.0
 pyserial>=3.5
 pynmea2>=1.18.0
 numpy>=1.23.0
+# New dependencies for ZED camera and U-BLOX GPS
+pyubx2>=1.2.33
+# Note: pyzed SDK cannot be installed via pip
+# It should be installed from the ZED SDK installer
+# See: https://www.stereolabs.com/docs/installation/
